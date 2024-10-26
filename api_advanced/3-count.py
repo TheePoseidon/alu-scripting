@@ -8,38 +8,36 @@ and prints a sorted count of given keywords
 import requests
 
 
-def count_words(subreddit, word_list, after="", count=None):
+def count_words(subreddit, word_list, after="", count=[]):
     """
-    Counts occurrences of keywords in the titles of hot posts on a subreddit.
+    Function to count the occurrences of given keywords in the titles of hot posts on a subreddit.
 
     Args:
         subreddit (str): The name of the subreddit to query.
         word_list (list): A list of keywords to search for.
-        after (str, optional): The "after" parameter for pagination.
-        count (list, optional): A list storing the counts of each keyword.
+        after (str, optional): The "after" parameter to fetch the next page of hot posts. Defaults to an empty string.
+        count (list, optional): A list to store the counts of each keyword. Defaults to an empty list.
 
     Returns:
         None
     """
-    if count is None:
+    if after == "":
         count = [0] * len(word_list)
 
-    url = f"https://www.reddit.com/r/{subreddit}/hot.json"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/126.0.0.0 Safari/537.36"
-    }
-    params = {'after': after}
-    response = requests.get(url, headers=headers, params=params, allow_redirects=False)
+    url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
+    request = requests.get(
+        url, params={
+            'after': after}, allow_redirects=False, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"})
 
-    if response.status_code == 200:
-        data = response.json()
+    if request.status_code == 200:
+        data = request.json()
 
-        for topic in data['data']['children']:
+        for topic in (data['data']['children']):
             for word in topic['data']['title'].split():
-                for i, target_word in enumerate(word_list):
-                    if target_word.lower() == word.lower():
+                for i in range(len(word_list)):
+                    if word_list[i].lower() == word.lower():
                         count[i] += 1
 
         after = data['data']['after']
@@ -51,14 +49,20 @@ def count_words(subreddit, word_list, after="", count=None):
                         save.append(j)
                         count[i] += count[j]
 
-            # Sorting by count and alphabetically
-            sorted_counts = sorted(
-                ((word_list[i].lower(), count[i]) for i in range(len(word_list)) if i not in save),
-                key=lambda x: (-x[1], x[0])
-            )
+            for i in range(len(word_list)):
+                for j in range(i, len(word_list)):
+                    if (count[j] > count[i] or
+                            (word_list[i] > word_list[j] and
+                             count[j] == count[i])):
+                        aux = count[i]
+                        count[i] = count[j]
+                        count[j] = aux
+                        aux = word_list[i]
+                        word_list[i] = word_list[j]
+                        word_list[j] = aux
 
-            for word, cnt in sorted_counts:
-                if cnt > 0:
-                    print(f"{word}: {cnt}")
+            for i in range(len(word_list)):
+                if (count[i] > 0) and i not in save:
+                    print("{}: {}".format(word_list[i].lower(), count[i]))
         else:
             count_words(subreddit, word_list, after, count)
